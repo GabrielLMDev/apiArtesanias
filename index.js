@@ -1,139 +1,74 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const { query, collection, addDoc, serverTimestamp, getDocs, doc, getDoc, where, orderBy, limit } = require('firebase/firestore');
-const { db } = require('./firebase/firebase-config');
 require('dotenv').config();
+const express = require('express');
+const cors = require('cors'); //Api restringida
+const helmet = require('helmet'); //Cabeceras seguras
+const rateLimit = require('express-rate-limit'); //Bloquea spam y ataques
+const { db } = require('./firebase/firebase');
+const productosRoute = require('./routes/products');
+const authRoute = require('./routes/auth');
+
 
 const app = express();
-
-// Express app setup
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors({ origin: true }));
-/* app.use(cors()); */
+// Seguridad básica
 app.use(helmet());
-app.use(express.json());
 
-// Routes
-app.post('/add-product', async (req, res) => {
-    try {
-        const {
-            name,
-            mainImage,
-            images,
-            availability,
-            price,
-            description,
-            features,
-            type,
-            TAG,
-            stars
-        } = req.body;
+//CORS solo desde frontend
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:5500', 'https://tusitio.com'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
 
-        if (!name || !mainImage || !price || !description) {
-            return res.status(400).json({ error: 'Missing required fields' });
+//Rate limit: max 50 peticiones por IP por 10 minutos
+const limiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 50,
+    message: 'Demasiadas peticiones desde esta IP, espera unos minutos.'
+});
+app.use(limiter);
+
+// Asegúrate que sea JSON válido
+app.use(express.json({
+    limit: '10kb',
+    verify: (req, res, buf) => {
+        try {
+            JSON.parse(buf.toString());
+        } catch (e) {
+            throw new Error('JSON inválido');
         }
-
-        const newProduct = {
-            name,
-            mainImage,
-            images: images || [],
-            availability: availability || 'Unknown',
-            price,
-            description,
-            features: features || {},
-            type,
-            TAG,
-            stars,
-            createdAt: serverTimestamp(),
-        };
-
-        const docRef = await addDoc(collection(db, 'products'), newProduct);
-        res.status(201).json({ message: 'Product added successfully', id: docRef.id });
-
-    } catch (error) {
-        console.error('Error adding product:', error);
-        res.status(500).json({ error: 'Internal server error' });
     }
-});
+}));
 
-app.get('/products', async (req, res) => {
+app.use('/api/productos', productosRoute);
+app.use('/api/auth', authRoute);
+
+
+// 🚫 Solo permitir rutas explícitas
+app.disable('x-powered-by');
+
+app.get('/', async (req, res) => {
     try {
-        const querySnapshot = await getDocs(collection(db, 'products'));
-        const products = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json({ products, success: true });
+        // Prueba de conexión: obtener timestamp del servidor
+        const serverTime = await db.collection('test').doc('test').get();
+        res.status(200).json({
+            success: true,
+            message: 'Conexión a Firestore exitosa ✅',
+            timestamp: serverTime.exists ? serverTime.updateTime.toDate() : null
+        });
     } catch (error) {
-        console.error('Error fetching products:', error);
-        res.status(500).json({ error: 'Failed to fetch products', success: false });
+        console.error('❌ Error de conexión a Firestore:', error.message);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
-app.get('/products/news/home', async (req, res) => {
-    console.log('Ejecutando consulta... /products/news/home')
-    try {
-        const q = query(
-            collection(db, 'products'),
-            where("type", "==", "Nuevo"),
-            orderBy("createdAt", "desc"),
-            limit(4)
-        );
-        const querySnapshot = await getDocs(q);
-        const products = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json({ products, success: true });
-        console.log(products)
-    } catch (error) {
-        console.error('Error fetching products:', error);
-        res.status(500).json({ error: 'Failed to fetch products', success: false });
-    }
-});
-
-app.get('/products/populars/home', async (req, res) => {
-    console.log('Ejecutando consulta... /products/populars/home')
-    try {
-        const q = query(
-            collection(db, 'products'),
-            where("type", "==", "Oferta"),
-            orderBy("createdAt", "desc"),
-            limit(4)
-        );
-        const querySnapshot = await getDocs(q);
-        const products = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json({ products, success: true });
-        console.log(products)
-    } catch (error) {
-        console.error('Error fetching products:', error);
-        res.status(500).json({ error: 'Failed to fetch products', success: false });
-    }
-});
-
-
-app.get('/product/:id', async (req, res) => {
-    const productId = req.params.id;
-
-    if (!productId) {
-        return res.status(400).json({ error: 'Missing product ID' });
-    }
-
-    try {
-        const docRef = doc(db, 'products', productId);
-        const docSnap = await getDoc(docRef);
-
-        if (!docSnap.exists()) {
-            return res.status(404).json({ error: 'Product not found', success: false });
-        }
-
-        res.status(200).json({ id: docSnap.id, ...docSnap.data(), success: true });
-
-    } catch (error) {
-        console.error('Error fetching product:', error);
-        res.status(500).json({ error: 'Failed to fetch product', success: false });
-
-    }
-});
-
-// Start server
 app.listen(PORT, () => {
-    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+    const url = process.env.RAILWAY_STATIC_URL
+        ? `https://${process.env.RAILWAY_STATIC_URL}`
+        : `http://localhost:${PORT}`;
+
+    console.log(`Servidor corriendo en ${url}`);
 });
