@@ -1,5 +1,5 @@
 const admin = require('firebase-admin');
-const serviceAccount = require('./sdk/adminsdk-main.json');
+/* const serviceAccount = require('./sdk/adminsdk-main.json'); */
 require('dotenv').config();
 
 /* admin.initializeApp({
