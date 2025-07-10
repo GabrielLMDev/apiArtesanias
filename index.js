@@ -6,7 +6,8 @@ const rateLimit = require('express-rate-limit'); //Bloquea spam y ataques
 const { db } = require('./firebase/firebase');
 const productosRoute = require('./routes/products');
 const authRoute = require('./routes/auth');
-
+const usersRoute = require('./routes/users');
+const uploadsRoute = require('./routes/uploads');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,11 +17,11 @@ app.use(helmet());
 
 //CORS solo desde frontend
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:5500', 'https://tusitio.com'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
+    origin: ['http://localhost:3000', 'http://127.0.0.1:5500', 'http://127.0.0.1:5501', 'https://tusitio.com'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 200
 }));
 
 //Rate limit: max 50 peticiones por IP por 10 minutos
@@ -45,6 +46,10 @@ app.use(express.json({
 
 app.use('/api/productos', productosRoute);
 app.use('/api/auth', authRoute);
+app.use('/api/users', usersRoute);
+app.use('/api/upload', uploadsRoute);
+
+
 
 
 // 🚫 Solo permitir rutas explícitas

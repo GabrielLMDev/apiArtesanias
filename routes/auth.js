@@ -19,12 +19,13 @@ router.post('/login', async (req, res) => {
         if (!passwordMatch) return res.status(401).json({ error: 'Credenciales inválidas' });
 
         const token = jwt.sign(
-            { email: admin.email, name: admin.name },
+            { email: admin.email, name: admin.name, role: admin.role },
             process.env.JWT_SECRET,
             { expiresIn: process.env.TOKEN_EXPIRES_IN }
         );
 
         res.json({ token });
+
     } catch (err) {
         console.error('Error en login:', err);
         res.status(500).json({ error: 'Error del servidor' });

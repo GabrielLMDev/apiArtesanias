@@ -19,6 +19,7 @@ admin.initializeApp({
     client_x509_cert_url: process.env.FB_CLIENT_X509_CERT_URL,
     universe_domain: process.env.FB_UNIVERSE_DOMAIN
   }),
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET
 });
 
 const db = admin.firestore();

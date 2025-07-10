@@ -2,8 +2,8 @@ const express = require('express');
 const admin = require('firebase-admin');
 const router = express.Router();
 const { db } = require('../firebase/firebase');
-const verifyToken = require('../middleware/verifyToken'); // o ajusta ruta
-
+const verifyToken = require('../middleware/verifyToken');
+const verifyRole = require('../middleware/verifyRole');
 
 // 👉 Crear producto
 router.post('/', verifyToken, async (req, res) => {
@@ -81,7 +81,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 });
 
 // 👉 Eliminar producto
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, verifyRole('admin'), async (req, res) => {
   try {
     await db.collection('products').doc(req.params.id).delete();
     res.status(200).json({ message: 'Producto eliminado' });
